@@ -9,6 +9,18 @@ internal static class RecordingOutputTests
         try
         {
             var settings = Path.Combine(directory, "settings", "recording-output.txt");
+            var recovery = Path.Combine(directory, "recovery", "autosave.dogscproj");
+            using (var owner = ProjectFileService.TryAcquireRecoveryLease(recovery))
+            {
+                Check(owner is not null, "First window can own recovery");
+                File.WriteAllText(recovery, "current project");
+                using var other = ProjectFileService.TryAcquireRecoveryLease(recovery);
+                Check(other is null && File.ReadAllText(recovery) == "current project",
+                    "Another window cannot claim recovery while the owner is open");
+            }
+            using var next = ProjectFileService.TryAcquireRecoveryLease(recovery);
+            Check(next is not null && File.ReadAllText(recovery) == "current project",
+                "A new window can use the previous owner's recovery after it closes");
             var original = Path.Combine(directory, "录屏 示例.mp4");
             Check(RecordingOutput.LoadPreference(settings) is null, "No default setting on first use");
             RecordingOutput.SavePreference(settings, original);

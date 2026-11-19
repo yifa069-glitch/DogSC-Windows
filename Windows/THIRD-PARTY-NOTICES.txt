@@ -10,7 +10,7 @@ ffmpeg-n9.0.2-57-gd838f9f9ae-win64-lgpl-shared-9.0.zip
 SHA-256:
 a1725f7fde34e20b05cb776cfe7e83a14221a247ea67c2f513e1e0492c13796b
 
-This is the LGPL shared variant. The installer includes the FFmpeg binaries and their adjacent shared libraries, the LGPL 3.0 license text, and FFmpeg build configuration. FFmpeg and its bundled libraries remain subject to their own licenses; see the build configuration and upstream source/build repositories for the exact component list and corresponding source:
+This is the LGPL shared variant. The installer includes the FFmpeg binaries and their adjacent shared libraries, the LGPL 2.1 and 3.0 license texts, and FFmpeg build configuration. FFmpeg and its bundled libraries remain subject to their own licenses; see the build configuration and upstream source/build repositories for the exact component list and corresponding source:
 https://ffmpeg.org/
 https://git.ffmpeg.org/ffmpeg.git
 https://github.com/BtbN/FFmpeg-Builds

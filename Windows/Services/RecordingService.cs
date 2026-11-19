@@ -202,7 +202,7 @@ public sealed class RecordingService : IDisposable
             Environment.NewLine + details);
     }
 
-    public async Task StopAsync()
+    public async Task<string?> StopAsync()
     {
         var pointerTrack = StopPointerCapture();
         var process = _process;
@@ -250,13 +250,10 @@ public sealed class RecordingService : IDisposable
 
         // Save marker timestamps independently of the media mux step so a later
         // audio merge failure does not destroy the user's recording notes.
-        var markers = GetMarkers();
-        if (videoFinalized && markers.Count > 0 && !string.IsNullOrWhiteSpace(_outputPath))
-        {
-            var markerPath = Path.ChangeExtension(_outputPath, ".markers.json");
-            var json = JsonSerializer.Serialize(markers, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(markerPath, json).ConfigureAwait(false);
-        }
+        var markerWarning = videoFinalized && _outputPath is not null
+            ? await SaveMarkersAsync(_outputPath, GetMarkers()).ConfigureAwait(false) : null;
+        if (markerWarning is not null)
+            StatusChanged?.Invoke("LOG:" + markerWarning);
 
         if (_systemAudioCapture is not null)
         {
@@ -268,24 +265,66 @@ public sealed class RecordingService : IDisposable
             try
             {
                 await capture.StopAsync().ConfigureAwait(false);
-                if (videoFinalized && !string.IsNullOrWhiteSpace(audioPath) && File.Exists(audioPath) &&
-                    new FileInfo(audioPath).Length > 44 && !string.IsNullOrWhiteSpace(_outputPath) &&
-                    File.Exists(_outputPath))
-                {
-                    await MixSystemAudioAsync(_outputPath, audioPath).ConfigureAwait(false);
-                }
+            }
+            catch
+            {
+                TryDelete(audioPath);
+                throw;
             }
             finally
             {
                 capture.Dispose();
-                TryDelete(audioPath);
             }
+
+            if (videoFinalized && _outputPath is not null && audioPath is not null &&
+                File.Exists(audioPath) && new FileInfo(audioPath).Length > 44)
+                await MergeCapturedAudioAsync(_outputPath, audioPath).ConfigureAwait(false);
+            else
+                TryDelete(audioPath);
         }
 
         if (!videoFinalized)
             throw new InvalidOperationException("录制未能正常保存。请查看 FFmpeg 日志。");
 
-        StatusChanged?.Invoke("录制已停止");
+        StatusChanged?.Invoke(markerWarning is null ? "录制已停止" : "录制已停止。" + markerWarning);
+        return markerWarning;
+    }
+
+    internal static async Task<string?> SaveMarkersAsync(string videoPath, IReadOnlyList<RecordingMarker> markers)
+    {
+        if (markers.Count == 0)
+            return null;
+
+        var markerPath = Path.ChangeExtension(videoPath, ".markers.json");
+        var temporaryPath = markerPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var stream = File.Create(temporaryPath))
+                await JsonSerializer.SerializeAsync(stream, markers, new JsonSerializerOptions { WriteIndented = true }).ConfigureAwait(false);
+            File.Move(temporaryPath, markerPath);
+            return null;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return $"录制标记未能保存到 {markerPath}：{error.Message}";
+        }
+        finally
+        {
+            TryDelete(temporaryPath);
+        }
+    }
+
+    internal async Task MergeCapturedAudioAsync(string videoPath, string audioPath)
+    {
+        try
+        {
+            await MixSystemAudioAsync(videoPath, audioPath).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            throw new InvalidOperationException($"系统声音未能合并。录屏路径：{videoPath}{Environment.NewLine}原始 WAV 已保留在 {audioPath}。{Environment.NewLine}{error.Message}", error);
+        }
+        TryDelete(audioPath);
     }
 
     private async Task MixSystemAudioAsync(string videoPath, string systemAudioPath)
@@ -492,7 +531,7 @@ public sealed class RecordingService : IDisposable
         {
             await using (var stream = File.Create(temporaryPath))
                 await JsonSerializer.SerializeAsync(stream, samples).ConfigureAwait(false);
-            File.Move(temporaryPath, path, overwrite: true);
+            File.Move(temporaryPath, path);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {

@@ -105,6 +105,48 @@ try
     Require(generate.ExitCode == 0 && File.Exists(source) && new FileInfo(source).Length > 1024,
         "could not generate source media: " + generate.Output);
 
+    Console.WriteLine("Checking marker conflicts and recovery of captured audio after a failed mux.");
+    var recording = Path.Combine(root, "finalization.mp4");
+    var videoOnly = await RunAsync(ffmpeg, "-hide_banner", "-loglevel", "error", "-i", source, "-an", "-c:v", "copy", recording);
+    Require(videoOnly.ExitCode == 0, "creating a silent capture failed: " + videoOnly.Output);
+    var markerPath = Path.ChangeExtension(recording, ".markers.json");
+    var markers = new[] { new RecordingMarker(1, 0.5, "marker", DateTimeOffset.UtcNow) };
+    Directory.CreateDirectory(markerPath);
+    var markerWarning = await RecordingService.SaveMarkersAsync(recording, markers);
+    Require(markerWarning?.Contains(markerPath) == true && Directory.Exists(markerPath),
+        "marker directory conflicts must be nonfatal and identify the destination.");
+    Directory.Delete(markerPath);
+    File.WriteAllText(markerPath, "existing markers");
+    markerWarning = await RecordingService.SaveMarkersAsync(recording, markers);
+    Require(markerWarning?.Contains(markerPath) == true && File.ReadAllText(markerPath) == "existing markers",
+        "a newly appeared marker sidecar must survive finalization.");
+    File.Delete(markerPath);
+    Require(await RecordingService.SaveMarkersAsync(recording, markers) is null &&
+        System.Text.Json.JsonSerializer.Deserialize<RecordingMarker[]>(File.ReadAllText(markerPath))?.Single() == markers[0],
+        "normal marker finalization must save the original marker.");
+    var loopback = Path.Combine(root, "loopback.wav");
+    var generateWav = await RunAsync(ffmpeg, "-hide_banner", "-loglevel", "error", "-i", source, "-vn", loopback);
+    Require(generateWav.ExitCode == 0, "creating a loopback fixture failed: " + generateWav.Output);
+    var wavBytes = File.ReadAllBytes(loopback);
+    using (var recorder = new RecordingService())
+    {
+        using (File.Open(recording, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            try
+            {
+                await recorder.MergeCapturedAudioAsync(recording, loopback);
+                throw new InvalidOperationException("A locked video must prevent replacement.");
+            }
+            catch (InvalidOperationException error) when (error.Message.Contains(loopback) && error.Message.Contains(recording))
+            {
+                Require(File.ReadAllBytes(loopback).SequenceEqual(wavBytes), "failed mux changed the only captured WAV.");
+            }
+        }
+        await recorder.MergeCapturedAudioAsync(recording, loopback);
+        Require(!File.Exists(loopback) && (await new MediaEditorService().ProbeAsync(recording)).HasAudio,
+            "successful mux should contain system audio and remove the temporary WAV.");
+    }
+
     Console.WriteLine("2/12 Verifying odd-sized window capture is padded for H.264.");
     const string evenSizeFilter = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0:color=black,format=nv12";
     var oddCaptureResult = await RunAsync(ffmpeg,

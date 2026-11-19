@@ -4,22 +4,23 @@ on:
   push:
     branches:
       - main
-      - windows-port
     tags:
       - "windows-v*"
     paths:
       - "Windows/**"
       - "Windows.SmokeTests/**"
       - ".github/workflows/windows-build.yml"
+      - "LICENSE"
   pull_request:
     paths:
       - "Windows/**"
       - "Windows.SmokeTests/**"
       - ".github/workflows/windows-build.yml"
+      - "LICENSE"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -27,9 +28,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Check Windows release version
-        id: version
         shell: pwsh
         run: |
           $project = [xml](Get-Content -Raw Windows/DogSC.Windows.csproj)
@@ -42,7 +44,7 @@ jobs:
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) {
             throw "Tag must match the Windows project version ($tag)."
           }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "DOGSC_VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Validate UTF-8 Chinese UI resources
         shell: pwsh
@@ -166,6 +168,9 @@ jobs:
           foreach ($requiredFile in @($appExe, $ffmpegExe, $ffprobeExe)) {
             if (!(Test-Path -LiteralPath $requiredFile)) { throw "Installed file missing: $requiredFile" }
           }
+          if ((Get-Item -LiteralPath $appExe).VersionInfo.FileVersion -ne $env:DOGSC_VERSION) {
+            throw "Installed executable version does not match $env:DOGSC_VERSION."
+          }
           & $ffmpegExe -hide_banner -version 2>&1 | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Packaged ffmpeg.exe could not start from the installed directory." }
           & $ffprobeExe -hide_banner -version 2>&1 | Out-Null
@@ -210,15 +215,37 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish tagged Windows preview release
-        if: startsWith(github.ref, 'refs/tags/windows-v') || (github.ref == 'refs/heads/windows-port' && contains(github.event.head_commit.message, '[publish-release]'))
-        uses: softprops/action-gh-release@v2
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/windows-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+    steps:
+      - name: Download verified installer
+        uses: actions/download-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          name: DogSC Windows Preview ${{ steps.version.outputs.tag }}
-          body: |
-            下载 DogSC-Setup-win-x64.exe 即可安装。安装包包含 .NET 桌面运行时和 FFmpeg。
-          files: artifacts/installer/DogSC-Setup-win-x64.exe
-          prerelease: true
-          generate_release_notes: true
+          name: DogSC-Windows-Installer
+
+      - name: Publish Windows preview with installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          asset=DogSC-Setup-win-x64.exe
+          test -s "$asset"
+          if release=$(gh release view "$GITHUB_REF_NAME" --json isDraft,isPrerelease,assets 2>/dev/null); then
+            if jq -e '.isDraft' <<<"$release" >/dev/null; then
+              gh release upload "$GITHUB_REF_NAME" "$asset" --clobber
+              gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease
+            else
+              jq -e --arg asset "$asset" '.isPrerelease and any(.assets[]; .name == $asset and .size > 0)' <<<"$release" >/dev/null
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" "$asset" --verify-tag --prerelease \
+              --title "DogSC Windows Preview $GITHUB_REF_NAME" \
+              --notes '下载 DogSC-Setup-win-x64.exe 即可安装。安装包包含 .NET 桌面运行时、FFmpeg 和 ffprobe。' \
+              --generate-notes
+          fi

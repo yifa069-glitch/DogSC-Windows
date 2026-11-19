@@ -8,6 +8,20 @@ public sealed class ProjectFileService
 {
     private const int CurrentVersion = 3;
 
+    public static FileStream? TryAcquireRecoveryLease(string recoveryPath)
+    {
+        var lockPath = Path.GetFullPath(recoveryPath) + ".lock";
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        try
+        {
+            return File.Open(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException error) when ((error.HResult & 0xffff) == 32)
+        {
+            return null;
+        }
+    }
+
     public async Task SaveAsync(string path, IReadOnlyList<ClipItem> clips)
     {
         var project = new ProjectDocument

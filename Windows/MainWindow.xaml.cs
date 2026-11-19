@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly DispatcherTimer _autosaveTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private Task _autosaveTask = Task.CompletedTask;
+    private FileStream? _recoveryLease;
     private bool _recoveryFinished;
     private bool _preserveRecovery;
     private string? _savedRecordingOutput;
@@ -189,10 +190,24 @@ public partial class MainWindow : Window
             await LoadCameraDevicesAsync();
             if (!_closing)
             {
-                _preserveRecovery = !await RecoverAutosaveAsync();
-                _recoveryFinished = true;
-                if (!_closing)
-                    _autosaveTimer.Start();
+                try
+                {
+                    _recoveryLease = ProjectFileService.TryAcquireRecoveryLease(AutosavePath);
+                    if (_recoveryLease is null)
+                        EditorStatusText.Text = "另一窗口正在使用自动恢复。请手动保存此窗口的项目。";
+                    else
+                    {
+                        _preserveRecovery = !await RecoverAutosaveAsync();
+                        _recoveryFinished = true;
+                        if (!_closing)
+                            _autosaveTimer.Start();
+                    }
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    EditorStatusText.Text = "无法启用自动恢复，请手动保存项目：" + error.Message;
+                    App.WriteDiagnostic("Recovery lease failed: " + error);
+                }
             }
             App.WriteDiagnostic("Audio/video device discovery finished");
         };
@@ -218,6 +233,8 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _recoveryLease?.Dispose();
+        _recoveryLease = null;
         _previewTimer.Stop();
         _autosaveTimer.Stop();
         _livePreviewTimer.Stop();
@@ -1071,9 +1088,10 @@ public partial class MainWindow : Window
         StopRecordingButton.IsEnabled = false;
         try
         {
-            await _recordingService.StopAsync();
+            var markerWarning = await _recordingService.StopAsync();
             _lastRecordingPath = _recordingService.OutputPath;
-            RecordingStatusText.Text = "录制已停止。输出文件：" + _lastRecordingPath;
+            RecordingStatusText.Text = "录制已停止。输出文件：" + _lastRecordingPath +
+                (markerWarning is null ? string.Empty : Environment.NewLine + markerWarning);
             EditRecordingButton.Visibility = File.Exists(_lastRecordingPath) ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception exception)
@@ -1787,7 +1805,7 @@ public partial class MainWindow : Window
 
     private async Task AutoSaveProjectAsync()
     {
-        if (!_recoveryFinished)
+        if (!_recoveryFinished || _recoveryLease is null)
             return;
 
         try
