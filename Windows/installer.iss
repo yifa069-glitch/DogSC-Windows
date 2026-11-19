@@ -1,6 +1,6 @@
 ﻿; Script generated for DogSC for Windows.
 #define MyAppName "DogSC for Windows"
-#define MyAppVersion "0.1.21.10"
+#define MyAppVersion "0.1.21.11"
 #define MyAppPublisher "DogSC"
 #define MyAppExeName "DogSC.Windows.exe"
 
@@ -17,6 +17,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64
 OutputDir=..\artifacts\installer
 OutputBaseFilename=DogSC-Setup-win-x64
+SetupIconFile=Assets\DogSC.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 LicenseFile=..\LICENSE
 Compression=lzma2/normal

@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:DogSC.Windows.Controls"
-        Title="DogSC" Height="960" Width="1600" MinHeight="820" MinWidth="1280"
+        Title="DogSC" Icon="/Assets/DogSC.ico" Height="960" Width="1600" MinHeight="820" MinWidth="1280"
         WindowStartupLocation="CenterScreen" Closing="MainWindow_Closing" PreviewKeyDown="MainWindow_PreviewKeyDown"
         FontFamily="Microsoft YaHei UI" Language="zh-CN" Background="#F2F6FC">
     <Window.Resources>
@@ -20,12 +20,8 @@
             <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#E8EDF5" BorderThickness="0,0,0,1"
                     CornerRadius="16,16,0,0" Padding="18,0">
                 <DockPanel LastChildFill="False" VerticalAlignment="Center">
-                    <Border DockPanel.Dock="Left" Width="42" Height="42" CornerRadius="12" Background="#1769F5" Margin="0,0,12,0">
-                        <Canvas Width="28" Height="26">
-                            <Border Canvas.Left="2" Canvas.Top="6" Width="18" Height="14" Background="#FFFFFF" CornerRadius="3" />
-                            <Polygon Canvas.Left="17" Canvas.Top="8" Points="0,0 8,4 0,10" Fill="#FFFFFF" />
-                        </Canvas>
-                    </Border>
+                    <Image DockPanel.Dock="Left" Width="42" Height="42" Margin="0,0,12,0"
+                           Source="/Assets/DogSC.png" RenderOptions.BitmapScalingMode="HighQuality" />
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="DogSC" FontSize="21" FontWeight="Bold" />
                         <TextBlock Text="Windows 预览版" FontSize="12" Foreground="#73819A" Margin="0,2,0,0" />

@@ -1,4 +1,4 @@
-# DogSC for Windows
+# <img src="Windows/Assets/DogSC.png" width="40" height="40" alt=""> DogSC for Windows
 
 DogSC 是一款在本地录制屏幕和剪辑视频的 Windows 桌面应用，适合制作软件教程。录制时会记录鼠标点击；编辑器可以按连续操作的位置自动放大画面，再平滑回到全景。
 
@@ -8,7 +8,7 @@ DogSC 是一款在本地录制屏幕和剪辑视频的 Windows 桌面应用，�
 
 支持 Windows 10 2004（内部版本 19041）及以上版本的 64 位 Windows。下载并运行 `DogSC-Setup-win-x64.exe`。安装包内含 .NET 桌面运行时、FFmpeg 和 ffprobe，可选创建桌面快捷方式。
 
-[下载 Windows x64 安装包](https://github.com/yifa069-glitch/DogSC-Windows/releases/download/windows-v0.1.21.10/DogSC-Setup-win-x64.exe) · [v0.1.21.10 发布说明](https://github.com/yifa069-glitch/DogSC-Windows/releases/tag/windows-v0.1.21.10) · [全部版本](https://github.com/yifa069-glitch/DogSC-Windows/releases)
+[下载 Windows x64 安装包](https://github.com/yifa069-glitch/DogSC-Windows/releases/download/windows-v0.1.21.11/DogSC-Setup-win-x64.exe) · [v0.1.21.11 发布说明](https://github.com/yifa069-glitch/DogSC-Windows/releases/tag/windows-v0.1.21.11) · [全部版本](https://github.com/yifa069-glitch/DogSC-Windows/releases)
 
 ## 录制并导出一段教程
 
