@@ -1,5 +1,7 @@
 # <img src="Windows/Assets/DogSC.png" width="40" height="40" alt=""> DogSC for Windows
 
+简体中文 · [English](README.en.md)
+
 DogSC 是一款在本地录制屏幕和剪辑视频的 Windows 桌面应用，适合制作软件教程。录制时会记录鼠标点击；编辑器可以按连续操作的位置自动放大画面，再平滑回到全景。
 
 本仓库维护 Windows x64 增强版。原作由神烦老狗开发，Windows 实现基于 spring-it 的社区移植版 `windows-v0.1.21`。[macOS 原项目](https://github.com/laogou717/dogsc) · [Windows 移植基线](https://github.com/spring-it/dogsc/releases/tag/windows-v0.1.21)
